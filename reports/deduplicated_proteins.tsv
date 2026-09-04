@@ -1,0 +1,68 @@
+Entry	Entry Name	Protein names	Gene Names	Organism	3D	Duplicate_Count	Representative_pLDDT	All_Merged_Entries	All_Merged_Genes
+A2ESN8	A2ESN8_TRIV3	tRNA (guanine-N(7)-)-methyltransferase (EC 2.1.1.33) (tRNA (guanine(46)-N(7))-methyltransferase) (tRNA(m7G46)-methyltransferase)	TVAG_069970	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	94.75	A2DE67, A2ESN8	TVAG_166600, TVAG_069970
+A2E5K9	TRM5_TRIV3	tRNA (guanine(37)-N(1))-methyltransferase (EC 2.1.1.228) (M1G-methyltransferase) (tRNA [GM37] methyltransferase) (tRNA methyltransferase 5 homolog)	TVAG_038970	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	93.69	A2E5K9	TVAG_038970
+A2ELF7	A2ELF7_TRIV3	Serine/threonine-protein (EC 2.7.11.1)	TVAG_257220	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	80.12	A2ELF7	TVAG_257220
+A2G3Y9	A2G3Y9_TRIV3	Cap-specific mRNA (nucleoside-2'-O-)-methyltransferase 1 (EC 2.1.1.57) (Cap1 2'O-ribose methyltransferase 1)	TVAG_116350	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	67.56	A2G3Y9	TVAG_116350
+A0A024E2S3	A0A024E2S3_TRIVA	diphthine methyl ester synthase (EC 2.1.1.314)	TVAG_243730 TVAG_243730.2	Trichomonas vaginalis		1	85.75	A0A024E2S3	TVAG_243730 TVAG_243730.2
+A2D8M2	A2D8M2_TRIV3	[histone H3]-lysine(4) N-trimethyltransferase (EC 2.1.1.354)	TVAG_185780	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	71.62	A2D8M2, A2DFW8, A2EBF3, A2EXA5	TVAG_185780, TVAG_162900, TVAG_127920, TVAG_440830
+A2FE15	A2FE15_TRIV3	Protein-S-isoprenylcysteine O-methyltransferase (EC 2.1.1.100)	TVAG_470080	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		3	93.88	A2DA36, A2E6A7, A2FE15	TVAG_476130, TVAG_459020, TVAG_470080
+A2DDT3	A2DDT3_TRIV3	phosphatidyl-N-methylethanolamine N-methyltransferase (EC 2.1.1.71)	TVAG_198980	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		5	94.31	A2DDT3, A2E543, A2EA18, A2EGZ1, A2ELQ8	TVAG_198980, TVAG_028040, TVAG_483740, TVAG_463190, TVAG_403800
+A2DJA1	A2DJA1_TRIV3	mRNA m(6)A methyltransferase (EC 2.1.1.348)	TVAG_136190	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	71.69	A2DJA1, A2DLK7, A2E165, A2G7D5	TVAG_136190, TVAG_062450, TVAG_389630, TVAG_002370
+A2EXH2	A2EXH2_TRIV3	Alpha N-terminal protein methyltransferase 1 (EC 2.1.1.244) (X-Pro-Lys N-terminal protein methyltransferase 1)	TVAG_253130	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		5	94.44	A2DJV9, A2EBE7, A2EXH2, A2FRA8, A2H4W3	TVAG_452370, TVAG_127860, TVAG_253130, TVAG_361900, TVAG_095110
+A2DM16	A2DM16_TRIV3	Trimethylguanosine synthase (Cap-specific guanine-N(2) methyltransferase)	TVAG_463050	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	79.38	A2DM16	TVAG_463050
+A2DQE1	A2DQE1_TRIV3	Putative tRNA (cytidine(32)/guanosine(34)-2'-O)-methyltransferase (EC 2.1.1.205) (2'-O-ribose RNA methyltransferase TRM7 homolog)	TVAG_319930	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	85.94	A2DQE1, A2F7C6	TVAG_319930, TVAG_092500
+A2DVE6	A2DVE6_TRIV3	Arsenite methyltransferase (EC 2.1.1.137)	TVAG_209040	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	88.44	A2DVE6, A2FK19	TVAG_209040, TVAG_346300
+A2DXE8	A2DXE8_TRIV3	rRNA 2'-O-methyltransferase fibrillarin (Histone-glutamine methyltransferase)	TVAG_380100	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	78.69	A2DXE8, A2E9S9	TVAG_380100, TVAG_282140
+A2DXH8	A2DXH8_TRIV3	tRNA (guanine(9)-N(1))-methyltransferase (EC 2.1.1.221)	TVAG_380400	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	85.88	A2DXH8	TVAG_380400
+A2E7Y7	A2E7Y7_TRIV3	mRNA cap guanine-N(7) methyltransferase (EC 2.1.1.56) (mRNA (guanine-N(7))-methyltransferase) (mRNA cap methyltransferase)	TVAG_127190	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	90.5	A2E7Y7, A2FYD5	TVAG_127190, TVAG_258890
+A2EQ50	A2EQ50_TRIV3	Leucine carboxyl methyltransferase 1 (EC 2.1.1.233)	TVAG_474040	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	96.0	A2E9W0, A2EQ50, A2EY25, A2FN76	TVAG_184240, TVAG_474040, TVAG_044530, TVAG_003240
+A2F3X6	A2F3X6_TRIV3	FtsJ-like methyltransferase family protein	TVAG_290980	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	88.94	A2EDQ1, A2F3X6	TVAG_309050, TVAG_290980
+A2EFA7	A2EFA7_TRIV3	NOL1/NOP2/sun family protein	TVAG_079770	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		3	90.5	A2EFA7, A2FNB4, A2FUH6	TVAG_079770, TVAG_427320, TVAG_380890
+A2EGA1	A2EGA1_TRIV3	Methylated-DNA--protein-cysteine methyltransferase (EC 2.1.1.63) (6-O-methylguanine-DNA methyltransferase) (O-6-methylguanine-DNA-alkyltransferase)	TVAG_401340	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	93.38	A2EGA1	TVAG_401340
+A2FAI4	A2FAI4_TRIV3	Methyltransferase domain-containing protein	TVAG_415010	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		11	94.0	A2ELU0, A2FNS0, A2D7N4, A2DBL7, A2DHN8, A2DJ12, A2EQY4, A2F9X6, A2FAE3, A2FAI4, A2FPX1	TVAG_151750, TVAG_137180, TVAG_120890, TVAG_093950, TVAG_365940, TVAG_228500, TVAG_040100, TVAG_018400, TVAG_299880, TVAG_415010, TVAG_255110
+A2EST3	A2EST3_TRIV3	Small RNA 2'-O-methyltransferase (EC 2.1.1.386)	TVAG_390290	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	89.5	A2EST3	TVAG_390290
+A2EVN6	A2EVN6_TRIV3	rRNA adenine N(6)-methyltransferase (EC 2.1.1.-)	TVAG_299080	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	91.81	A2EVN6	TVAG_299080
+A2F0C3	A2F0C3_TRIV3	Ribosomal RNA-processing protein 8 (EC 2.1.1.-)	TVAG_292510	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	87.12	A2F0C3	TVAG_292510
+A2F7I7	A2F7I7_TRIV3	NOL1/NOP2/sun family putative RNA methylase containing protein	TVAG_115490	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	81.94	A2F7I7	TVAG_115490
+A2FB51	A2FB51_TRIV3	protein-histidine N-methyltransferase (EC 2.1.1.85)	TVAG_490140	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	89.69	A2FB51	TVAG_490140
+A2FGC5	A2FGC5_TRIV3	tRNA (guanine(26)-N(2))-dimethyltransferase (EC 2.1.1.216)	TVAG_309480	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	93.19	A2FDH4, A2FGC4, A2FGC5, A2FQY9	TVAG_353820, TVAG_309470, TVAG_309480, TVAG_439220
+A0A7D6J3B8	A0A7D6J3B8_TRIVA	Serine hydroxymethyltransferase		Trichomonas vaginalis		4	97.69	A0A7D6IR89, A0A7D6J3B8, J7GLI3, J7GRU0	TVAG_109540
+A2ETI5	A2ETI5_TRIV3	Histone-lysine N-methyltransferase, H3 lysine-9 specific, putative	TVAG_055170	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		18	96.25	A2D741, A2DAU2, A2DFG3, A2DRS8, A2E3T6, A2E525, A2EG19, A2ERJ9, A2ESK8, A2ETI5, A2EWF4, A2F2D3, A2FP40, A2FXV5, A2FYQ0, A2G929, A2HW98, A2I0Q0	TVAG_118930, TVAG_036200, TVAG_437170, TVAG_150260, TVAG_117460, TVAG_027860, TVAG_269060, TVAG_059240, TVAG_350630, TVAG_055170, TVAG_325530, TVAG_493250, TVAG_181360, TVAG_099450, TVAG_091620, TVAG_165700, TVAG_503520, TVAG_547020
+A2D7F8	A2D7F8_TRIV3	Pre-SET motif family protein	TVAG_120120	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	75.5	A2D7F8	TVAG_120120
+A2D8E9	A2D8E9_TRIV3	Maf-like protein	TVAG_185040	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	95.5	A2D8E9, A2G104	TVAG_185040, TVAG_229840
+A2D905	A2D905_TRIV3	MORN repeat-containing protein 3	TVAG_182670	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	75.31	A2D905	TVAG_182670
+A2D908	A2D908_TRIV3	Generic methyltransferase, putative	TVAG_182700	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	91.31	A2D908	TVAG_182700
+A2DEG6	A2DEG6_TRIV3	SPRY domain containing protein	TVAG_282630	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		3	93.81	A2DEG6, A2EBF7, A2EIP5	TVAG_282630, TVAG_127960, TVAG_499590
+A2DF37	A2DF37_TRIV3	tRNA (guanine-N(7)-)-methyltransferase non-catalytic subunit WD40 domain-containing protein	TVAG_172870	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	89.62	A2DF37	TVAG_172870
+A2GIP8	A2GIP8_TRIV3	Methyltransferase type 11 domain-containing protein	TVAG_031080	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		7	95.88	A2DHB5, A2DMN7, A2E6W3, A2EDP7, A2FH79, A2FTV4, A2GIP8	TVAG_021330, TVAG_253700, TVAG_081710, TVAG_309010, TVAG_123080, TVAG_277450, TVAG_031080
+A2EGQ3	A2EGQ3_TRIV3	SET domain containing protein	TVAG_302280	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		3	74.19	A2DIU2, A2EGQ3, A2F5J1	TVAG_433010, TVAG_302280, TVAG_087990
+A2DJK9	A2DJK9_TRIV3	Protein-S-isoprenylcysteine O-methyltransferase	TVAG_101270	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	89.38	A2DJK9	TVAG_101270
+A2FJH1	A2FJH1_TRIV3	type I protein arginine methyltransferase (EC 2.1.1.319)	TVAG_433490	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	95.12	A2DME7, A2E549, A2FJH1, A2FPG1	TVAG_045760, TVAG_028100, TVAG_433490, TVAG_199700
+A2DMU5	A2DMU5_TRIV3	Methyltransferase-like protein 5	TVAG_254280	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	90.25	A2DMU5	TVAG_254280
+A2DMX1	A2DMX1_TRIV3	Capsuleen, putative	TVAG_254540	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	92.88	A2DMX1, A2G4Z8	TVAG_254540, TVAG_096150
+A2DN93	A2DN93_TRIV3	Uncharacterized protein	TVAG_306010	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		10	93.88	A2DN93, A2DZV3, A2E1C8, A2E5Z3, A2EDB3, A2EHM0, A2EL80, A2F2L6, A2FR04, A2G627	TVAG_306010, TVAG_478370, TVAG_343240, TVAG_399550, TVAG_417930, TVAG_312150, TVAG_069250, TVAG_207530, TVAG_317290, TVAG_193910
+A2FCQ2	A2FCQ2_TRIV3	Arginine methyltransferase, putative	TVAG_048280	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	88.44	A2DNX4, A2FCQ2	TVAG_225950, TVAG_048280
+A2F4W6	A2F4W6_TRIV3	MORN repeat family protein	TVAG_196340	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	79.94	A2DUB8, A2EK69, A2EU28, A2F4W6	TVAG_262060, TVAG_100020, TVAG_063580, TVAG_196340
+A2E4S8	A2E4S8_TRIV3	carnosine N-methyltransferase (EC 2.1.1.22)	TVAG_246220	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	92.75	A2E4S8	TVAG_246220
+A2F2J3	A2F2J3_TRIV3	Maf protein	TVAG_265960	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	95.69	A2E4U5, A2F2J3	TVAG_160900, TVAG_265960
+A2FPZ7	A2FPZ7_TRIV3	site-specific DNA-methyltransferase (adenine-specific) (EC 2.1.1.72)	TVAG_007390	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		4	87.88	A2E5M3, A2EZ81, A2FPZ7, A2GP16	TVAG_039120, TVAG_051460, TVAG_007390, TVAG_527790
+A2EAA2	A2EAA2_TRIV3	D12 class N6 adenine-specific DNA methyltransferase family protein	TVAG_271330	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		3	87.75	A2E7Q8, A2EAA2, A2HEL1	TVAG_344370, TVAG_271330, TVAG_557140
+A2G673	A2G673_TRIV3	Methyltransferase, FkbM family protein	TVAG_454840	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		5	81.75	A2E9Q9, A2F1K3, A2FDN2, A2FHK8, A2G673	TVAG_281940, TVAG_440470, TVAG_011250, TVAG_459480, TVAG_454840
+A2FP34	A2FP34_TRIV3	TsaA-like domain-containing protein	TVAG_181300	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		3	94.19	A2EBW9, A2FC71, A2FP34	TVAG_259180, TVAG_335440, TVAG_181300
+A2ECU9	A2ECU9_TRIV3	Methyltransferase small domain-containing protein	TVAG_102430	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	94.38	A2ECU9	TVAG_102430
+A2EF78	A2EF78_TRIV3	MGC83087 protein, putative	TVAG_079460	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	96.06	A2EF78, A2FNP4	TVAG_079460, TVAG_427110
+A2EG78	A2EG78_TRIV3	Tyr recombinase domain-containing protein	TVAG_352760	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	82.81	A2EG78	TVAG_352760
+A2EN39	A2EN39_TRIV3	Beige/BEACH domain containing protein	TVAG_087250	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	N/A	A2EN39	TVAG_087250
+A2EQG5	A2EQG5_TRIV3	Meichroacidin, putative	TVAG_108410	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	76.31	A2EQG5	TVAG_108410
+A2ERV9	A2ERV9_TRIV3	DUF2428 domain-containing protein	TVAG_473130	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	N/A	A2ERV9	TVAG_473130
+A2EVN9	A2EVN9_TRIV3	MGC78809 protein, putative	TVAG_299110	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	89.0	A2EVN9	TVAG_299110
+A2F007	A2F007_TRIV3	MORN repeat-containing protein 5	TVAG_111480	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	73.75	A2F007	TVAG_111480
+A2F2A3	A2F2A3_TRIV3	Menaquinone biosynthesis methyltransferase, putative	TVAG_382000	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	88.56	A2F2A3	TVAG_382000
+A2F5C5	A2F5C5_TRIV3	O-methyltransferase N-terminus family protein	TVAG_222490	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	92.12	A2F5C5	TVAG_222490
+A2FEZ1	A2FEZ1_TRIV3	S-adenosylmethionine-dependent methyltransferase, putative	TVAG_256850	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	94.0	A2FEZ1	TVAG_256850
+A2FG01	A2FG01_TRIV3	PHD-finger family protein	TVAG_270510	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	71.19	A2FG01	TVAG_270510
+A2FNB1	A2FNB1_TRIV3	Serine hydrolase domain-containing protein	TVAG_427290	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	96.56	A2FNB1	TVAG_427290
+A2FNV4	A2FNV4_TRIV3	Phosphoethanolamine N-methyltransferase-related protein	TVAG_376050	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	85.69	A2FNV4	TVAG_376050
+A2FXA0	A2FXA0_TRIV3	Methyltransferase, putative	TVAG_029510	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		2	94.81	A2FXA0, A2G5Z9	TVAG_029510, TVAG_466240
+A2FYV2	A2FYV2_TRIV3	Membrane protein, putative	TVAG_009340	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	89.19	A2FYV2	TVAG_009340
+A2G151	A2G151_TRIV3	Methyltransferase, putative, TIGR00027 family protein	TVAG_009470	Trichomonas vaginalis (strain ATCC PRA-98 / G3)		1	94.31	A2G151	TVAG_009470

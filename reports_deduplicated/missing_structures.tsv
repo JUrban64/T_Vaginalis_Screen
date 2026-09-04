@@ -1,0 +1,3 @@
+Entry	Entry Name	Protein names	Gene Names	Organism	HTTP_Code	Error_Message
+A2EN39	A2EN39_TRIV3	Beige/BEACH domain containing protein	TVAG_087250	Trichomonas vaginalis (strain ATCC PRA-98 / G3)	404	Struktura není v AlphaFold DB dostupná (404 Not Found)
+A2ERV9	A2ERV9_TRIV3	DUF2428 domain-containing protein	TVAG_473130	Trichomonas vaginalis (strain ATCC PRA-98 / G3)	404	Struktura není v AlphaFold DB dostupná (404 Not Found)
