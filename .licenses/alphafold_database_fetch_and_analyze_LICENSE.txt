@@ -1,0 +1,9 @@
+AlphaFold Database License & Terms Notification
+Timestamp: 2026-09-04T11:30:30+02:00
+URL: https://alphafold.ebi.ac.uk/
+
+Structures predicted by AlphaFold and distributed via AlphaFold DB are provided under the Creative Commons Attribution 4.0 International (CC-BY 4.0) license.
+Please review the full terms of use at https://alphafold.ebi.ac.uk/about.
+When publishing results using these structures, cite:
+- Jumper, J. et al. Highly accurate protein structure prediction with AlphaFold. Nature 596, 583-589 (2021).
+- Varadi, M. et al. AlphaFold Protein Structure Database: massively expanding the structural coverage of protein-sequence space with high-accuracy models. Nucleic Acids Res. 50, D439-D444 (2022).

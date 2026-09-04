@@ -1,0 +1,8 @@
+Entry,Entry Name,Protein names,Gene Names,Organism,HTTP_Code,Error_Message
+A2E5M3,A2E5M3_TRIV3,site-specific DNA-methyltransferase (adenine-specific) (EC 2.1.1.72),TVAG_039120,Trichomonas vaginalis (strain ATCC PRA-98 / G3),404,Struktura není v AlphaFold DB dostupná (404 Not Found)
+A2EDB3,A2EDB3_TRIV3,Uncharacterized protein,TVAG_417930,Trichomonas vaginalis (strain ATCC PRA-98 / G3),404,Struktura není v AlphaFold DB dostupná (404 Not Found)
+A2EL80,A2EL80_TRIV3,Uncharacterized protein,TVAG_069250,Trichomonas vaginalis (strain ATCC PRA-98 / G3),404,Struktura není v AlphaFold DB dostupná (404 Not Found)
+A2EN39,A2EN39_TRIV3,Beige/BEACH domain containing protein,TVAG_087250,Trichomonas vaginalis (strain ATCC PRA-98 / G3),404,Struktura není v AlphaFold DB dostupná (404 Not Found)
+A2ERV9,A2ERV9_TRIV3,DUF2428 domain-containing protein,TVAG_473130,Trichomonas vaginalis (strain ATCC PRA-98 / G3),404,Struktura není v AlphaFold DB dostupná (404 Not Found)
+A2EZ81,A2EZ81_TRIV3,site-specific DNA-methyltransferase (adenine-specific) (EC 2.1.1.72),TVAG_051460,Trichomonas vaginalis (strain ATCC PRA-98 / G3),404,Struktura není v AlphaFold DB dostupná (404 Not Found)
+J7GLI3,J7GLI3_TRIVA,Serine hydroxymethyltransferase,TVAG_109540,Trichomonas vaginalis,404,Struktura není v AlphaFold DB dostupná (404 Not Found)
