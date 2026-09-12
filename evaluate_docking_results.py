@@ -229,8 +229,15 @@ def compute_decorrelated_scores(df: pd.DataFrame) -> pd.DataFrame:
         expected_scores = slope * df["MW"].values + intercept
         residuals = df["docking_score"].values - expected_scores
 
+        # MW_adjusted_score: Očištěné skóre na reálné škále kcal/mol
+        # Odstraníme vliv odchylky od průměrné hmotnosti:
+        # MW_adjusted_score = docking_score - slope * (MW - mean_MW) = residual + mean_score
+        mean_score = float(np.mean(scores))
+        adjusted_scores = residuals + mean_score
+
         df["MW_expected_score"] = np.round(expected_scores, 2)
         df["MW_residual_score"] = np.round(residuals, 2)
+        df["MW_adjusted_score"] = np.round(adjusted_scores, 2)
 
         # Standardizované Z-skóre reziduí
         std_res = np.std(residuals)
@@ -241,9 +248,11 @@ def compute_decorrelated_scores(df: pd.DataFrame) -> pd.DataFrame:
 
         print(f"[*] Korelace mezi MW a Docking Score: r = {r_corr:.3f}")
         print(f"[*] Lineární model: Očekávané skóre = {slope:.4f} * MW + ({intercept:.2f})")
+        print(f"[*] MW-Adjusted Score: Odstraněna závislost na MW, průměrné skóre zachováno na {mean_score:.2f} kcal/mol")
     else:
         df["MW_expected_score"] = np.nan
         df["MW_residual_score"] = np.nan
+        df["MW_adjusted_score"] = np.nan
         df["MW_residual_zscore"] = np.nan
 
     return df
@@ -419,11 +428,17 @@ def main():
     matrix_scores.to_csv(output_dir / "docking_scores_matrix.csv")
     print(f"[+] Matice skóre (Ligandy x Proteiny) uložena do: '{output_dir / 'docking_scores_matrix.csv'}'")
 
-    # Matice reziduálních skóre (bez vlivu hmotnosti)
+    # Matice MW-očištěných skóre (normalizováno k průměrné MW, na reálné škále kcal/mol)
+    if "MW_adjusted_score" in best_df.columns and not best_df["MW_adjusted_score"].isna().all():
+        matrix_adj = best_df.pivot_table(index="compound_id", columns="target_id", values="MW_adjusted_score")
+        matrix_adj.to_csv(output_dir / "docking_mw_adjusted_matrix.csv")
+        print(f"[+] Matice MW-očištěných skóre (kcal/mol) uložena do: '{output_dir / 'docking_mw_adjusted_matrix.csv'}'")
+
+    # Matice čistých reziduálních skóre (kolem 0.0)
     if "MW_residual_score" in best_df.columns and not best_df["MW_residual_score"].isna().all():
         matrix_res = best_df.pivot_table(index="compound_id", columns="target_id", values="MW_residual_score")
         matrix_res.to_csv(output_dir / "docking_mw_residuals_matrix.csv")
-        print(f"[+] Matice reziduálních skóre uložena do: '{output_dir / 'docking_mw_residuals_matrix.csv'}'")
+        print(f"[+] Matice reziduálních skóre (kolem 0.0) uložena do: '{output_dir / 'docking_mw_residuals_matrix.csv'}'")
 
     # 6. Agregace cílů a ranking (hledáme proteiny s nejvíce vazači a nejsilnější afinitou)
     print("[*] Vytvářím ranking proteinových cílů...")

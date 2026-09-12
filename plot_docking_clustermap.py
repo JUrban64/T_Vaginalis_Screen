@@ -176,15 +176,32 @@ def sanitize_compound_label(label: str, max_len: int = 16) -> str:
     return s
 
 
-def load_matrix(input_path: Path) -> tuple[pd.DataFrame, Path]:
-    """Načte matici skóre z CSV nebo adresáře reportů."""
+def load_matrix(input_path: Path, score_type: str = "adjusted") -> tuple[pd.DataFrame, Path, str]:
+    """Načte matici skóre z CSV nebo adresáře reportů s podporou MW-adjusted matice."""
+    used_type = score_type
     if input_path.is_dir():
-        score_file = input_path / "docking_scores_matrix.csv"
-        if not score_file.exists():
+        score_file = None
+        if score_type == "adjusted":
+            cand = input_path / "docking_mw_adjusted_matrix.csv"
+            if cand.exists():
+                score_file = cand
+                used_type = "MW-Adjusted (kcal/mol)"
+            else:
+                score_file = input_path / "docking_scores_matrix.csv"
+                used_type = "Raw (fallback)"
+        elif score_type == "residual":
+            score_file = input_path / "docking_mw_residuals_matrix.csv"
+            used_type = "MW-Residuals"
+        else:
+            score_file = input_path / "docking_scores_matrix.csv"
+            used_type = "Raw (surová skóre)"
+
+        if not score_file or not score_file.exists():
             candidates = list(input_path.glob("*matrix*.csv"))
             if not candidates:
                 raise FileNotFoundError(f"V adresáři '{input_path}' nebyl nalezen 'docking_scores_matrix.csv'!")
             score_file = candidates[0]
+            used_type = score_file.stem
         matrix_df = pd.read_csv(score_file, index_col=0)
         output_dir = input_path
     else:
@@ -192,9 +209,10 @@ def load_matrix(input_path: Path) -> tuple[pd.DataFrame, Path]:
             raise FileNotFoundError(f"Soubor '{input_path}' neexistuje!")
         matrix_df = pd.read_csv(input_path, index_col=0)
         output_dir = input_path.parent
+        used_type = input_path.stem
 
     matrix_df = matrix_df.apply(pd.to_numeric, errors="coerce")
-    return matrix_df, output_dir
+    return matrix_df, output_dir, used_type
 
 
 def prepare_matrix_orientation(
@@ -378,6 +396,12 @@ Příklady použití:
         help="Cílová složka pro grafy (výchozí: <input_dir>/plots)."
     )
     parser.add_argument(
+        "--score-type",
+        choices=["adjusted", "raw", "residual"],
+        default="adjusted",
+        help="Typ dokovacího skóre: 'adjusted' (výchozí: MW-očištěné na škále kcal/mol), 'raw' (surové), nebo 'residual' (kolem 0)."
+    )
+    parser.add_argument(
         "--rows",
         choices=["proteins", "ligands"],
         default="proteins",
@@ -391,7 +415,7 @@ Příklady použití:
     parser.add_argument(
         "--both",
         action="store_true",
-        help="Vykreslí jak surová skóre (kcal/mol), tak MW-reziduální skóre."
+        help="Vykreslí jak surová skóre (kcal/mol), tak MW-reziduální/očištěná skóre."
     )
     parser.add_argument(
         "--standardize",
@@ -442,7 +466,7 @@ Příklady použití:
 
     # 1. Načtení matice
     try:
-        matrix_df, base_out_dir = load_matrix(args.input)
+        matrix_df, base_out_dir, used_score_type = load_matrix(args.input, score_type=args.score_type)
     except Exception as e:
         print(f"[!] Chyba při načítání matice: {e}", file=sys.stderr)
         sys.exit(1)
@@ -463,6 +487,7 @@ Příklady použití:
 
     print("=" * 70)
     print("Vytváření hierarchické Clustermapy dokovacích skóre:")
+    print(f"  Typ skóre:         {used_score_type}")
     print(f"  Orientace os:      Řádky (Y) = {row_entity.upper()} ({df_imputed.shape[0]}), Sloupce (X) = {col_entity.upper()} ({df_imputed.shape[1]})")
     print(f"  Metrika/Metoda:    {args.metric} / {args.method}")
     print(f"  Standardizace:     {args.standardize}")
@@ -504,29 +529,39 @@ Příklady použití:
         dpi=args.dpi,
     )
 
-    # B) Volitelné vykreslení matice reziduí očištěných od hmotnosti (--both)
-    residuals_file = base_out_dir / "docking_mw_residuals_matrix.csv"
-    if (args.both or "residuals" in str(args.input)) and residuals_file.exists():
-        print("\n[*] Nalezena matice MW-reziduí. Generuji Clustermapu bez vlivu molekulové hmotnosti...")
-        try:
-            res_df = pd.read_csv(residuals_file, index_col=0).apply(pd.to_numeric, errors="coerce")
-            res_oriented, r_ent, c_ent = prepare_matrix_orientation(
-                res_df, desired_rows=args.rows, annotations=annotations
-            )
-            res_imputed = impute_missing(res_oriented)
+    # B) Volitelné vykreslení MW-očištěné matice / reziduí (--both)
+    adj_file = base_out_dir / "docking_mw_adjusted_matrix.csv"
+    res_file = base_out_dir / "docking_mw_residuals_matrix.csv"
 
-            out_png_res = out_dir / "clustermap_docking_mw_residuals.png"
-            out_pdf_res = out_dir / "clustermap_docking_mw_residuals.pdf"
+    target_second_file = adj_file if adj_file.exists() else (res_file if res_file.exists() else None)
+
+    if (args.both or "residuals" in str(args.input)) and target_second_file and target_second_file.exists():
+        is_adj = (target_second_file == adj_file)
+        lbl_type = "MW-Adjusted (kcal/mol)" if is_adj else "MW-Residuals"
+        print(f"\n[*] Nalezena matice {lbl_type}. Generuji srovnávací Clustermapu bez vlivu molekulové hmotnosti...")
+        try:
+            sec_df = pd.read_csv(target_second_file, index_col=0).apply(pd.to_numeric, errors="coerce")
+            sec_oriented, r_ent, c_ent = prepare_matrix_orientation(
+                sec_df, desired_rows=args.rows, annotations=annotations
+            )
+            sec_imputed = impute_missing(sec_oriented)
+
+            file_stem = "clustermap_docking_mw_adjusted" if is_adj else "clustermap_docking_mw_residuals"
+            out_png_sec = out_dir / f"{file_stem}.png"
+            out_pdf_sec = out_dir / f"{file_stem}.pdf"
+
+            cbar_sec = "MW-Očištěná afinita\n[kcal/mol]\n(nižší = silnější)" if is_adj else "Reziduum afinity\n[kcal/mol]\n(záporné = lepší než MW)"
+            title_sec = "Clustermapa dokování: Skóre očištěné od vlivu molekulové hmotnosti (MW-Adjusted)" if is_adj else "Clustermapa dokování: Rezidua od modelu hmotnosti (MW Residuals)"
 
             plot_clustermap_figure(
-                df=res_imputed,
-                title="Clustermapa dokování očištěná od molekulové hmotnosti (MW Residuals)",
-                cbar_label="Reziduum afinity\n[kcal/mol]\n(záporné = lepší než MW)",
-                out_png=out_png_res,
-                out_pdf=out_pdf_res,
+                df=sec_imputed,
+                title=title_sec,
+                cbar_label=cbar_sec,
+                out_png=out_png_sec,
+                out_pdf=out_pdf_sec,
                 row_entity=r_ent,
                 col_entity=c_ent,
-                cmap="coolwarm_r",
+                cmap="viridis_r" if is_adj else "coolwarm_r",
                 standardize="none",
                 metric=args.metric,
                 method=args.method,
@@ -534,7 +569,7 @@ Příklady použití:
                 dpi=args.dpi,
             )
         except Exception as e:
-            print(f"[!] Selhalo vykreslení clustermapy reziduí: {e}", file=sys.stderr)
+            print(f"[!] Selhalo vykreslení srovnávací clustermapy: {e}", file=sys.stderr)
 
     print("\n[✓] Hotovo! Všechny clustermapy byly úspěšně vygenerovány.")
 

@@ -11,7 +11,8 @@
 #        [Záporné hodnoty = ligand se váže na cílový protein silněji než na zbytek]
 #
 # Osa Y: Statistická významnost
-#        -log10(p-hodnota) z robustního Z-testu / t-testu vůči distribuci na panelu
+#        -log10(FDR / q-hodnota) z Benjamini-Hochberg korekce (nebo Bonferroni / raw-p)
+#        z robustního testu vůči distribuci na panelu
 #
 # Výstup:
 #   1. Publikační Volcano plot (PNG 300 DPI + PDF) s prahovými čarami a popisky hitů.
@@ -46,6 +47,32 @@ try:
     ADJUST_TEXT_AVAILABLE = True
 except ImportError:
     ADJUST_TEXT_AVAILABLE = False
+
+
+def multipletests_adjust(p_values: list[float] | np.ndarray, method: str = "fdr") -> np.ndarray:
+    """
+    Korekce p-hodnot na vícenásobné testování hypotéz (NumPy kompatibilní, bez nutnosti statsmodels).
+    """
+    p = np.asarray(p_values, dtype=float)
+    n = len(p)
+    if n == 0 or method == "none":
+        return p.copy()
+
+    if method == "bonferroni":
+        return np.clip(p * n, 0.0, 1.0)
+
+    if method in ("fdr", "fdr_bh", "bh"):
+        order = np.argsort(p)
+        ranks = np.arange(1, n + 1)
+        p_sorted = p[order]
+        p_adj_sorted = p_sorted * (n / ranks)
+        p_adj_sorted = np.minimum.accumulate(p_adj_sorted[::-1])[::-1]
+        p_adj_sorted = np.clip(p_adj_sorted, 0.0, 1.0)
+        p_adj = np.empty_like(p_adj_sorted)
+        p_adj[order] = p_adj_sorted
+        return p_adj
+
+    return p.copy()
 
 
 def load_protein_annotations(search_dir: Path | None = None) -> dict[str, str]:
@@ -141,17 +168,35 @@ def sanitize_compound_label(label: str, max_len: int = 16) -> str:
     return s
 
 
-def load_data(input_path: Path, known_targets: set[str] | None = None) -> tuple[pd.DataFrame, pd.DataFrame | None, Path]:
+def load_data(input_path: Path, score_type: str = "adjusted", known_targets: set[str] | None = None) -> tuple[pd.DataFrame, pd.DataFrame | None, Path, str]:
     """
     Načte matici skóre a zajistí, že SLOUPCE jsou PROTEINY a ŘÁDKY jsou SLOUČENINY.
+    Podporuje score_type: 'adjusted' (výchozí, bez vlivu MW), 'raw', 'residual'.
     """
+    used_type = score_type
     if input_path.is_dir():
-        score_file = input_path / "docking_scores_matrix.csv"
-        if not score_file.exists():
-            candidates = list(input_path.glob("*scores_matrix*.csv"))
+        score_file = None
+        if score_type == "adjusted":
+            cand = input_path / "docking_mw_adjusted_matrix.csv"
+            if cand.exists():
+                score_file = cand
+                used_type = "MW-Adjusted (kcal/mol)"
+            else:
+                score_file = input_path / "docking_scores_matrix.csv"
+                used_type = "Raw (fallback)"
+        elif score_type == "residual":
+            score_file = input_path / "docking_mw_residuals_matrix.csv"
+            used_type = "MW-Residuals"
+        else:
+            score_file = input_path / "docking_scores_matrix.csv"
+            used_type = "Raw (surová skóre)"
+
+        if not score_file or not score_file.exists():
+            candidates = list(input_path.glob("*matrix*.csv"))
             if not candidates:
                 raise FileNotFoundError(f"V adresáři '{input_path}' nebyl nalezen 'docking_scores_matrix.csv'!")
             score_file = candidates[0]
+            used_type = score_file.stem
         matrix_df = pd.read_csv(score_file, index_col=0)
 
         ranking_file = input_path / "protein_ranking_summary.csv"
@@ -164,6 +209,7 @@ def load_data(input_path: Path, known_targets: set[str] | None = None) -> tuple[
         ranking_file = input_path.parent / "protein_ranking_summary.csv"
         ranking_df = pd.read_csv(ranking_file) if ranking_file.exists() else None
         output_dir = input_path.parent
+        used_type = input_path.stem
 
     matrix_df = matrix_df.apply(pd.to_numeric, errors="coerce")
 
@@ -172,25 +218,26 @@ def load_data(input_path: Path, known_targets: set[str] | None = None) -> tuple[
     if targets_axis == "targets_in_rows":
         matrix_df = matrix_df.T
 
-    # Odfiltrování neproteinových sloupců
     valid_cols = [c for c in matrix_df.columns if is_likely_target_id(str(c), known_targets)]
     if len(valid_cols) >= 3:
         matrix_df = matrix_df[valid_cols]
 
     matrix_df.columns.name = "target_id"
     matrix_df.index.name = "compound_id"
-    return matrix_df, ranking_df, output_dir
+    return matrix_df, ranking_df, output_dir, used_type
 
 
 def calculate_target_selectivity(
     matrix_df: pd.DataFrame,
     target_id: str,
+    p_adjust: str = "fdr",
     potent_cutoff: float = -7.0,
     p_cutoff: float = 0.05,
     delta_cutoff: float = 1.0,
 ) -> pd.DataFrame:
     """
-    Spočítá selektivitu a statistickou významnost pro každý ligand vůči zadanému proteinu.
+    Spočítá selektivitu a statistickou významnost pro každý ligand vůči zadanému proteinu
+    s volitelnou korekcí na vícenásobné testování (FDR / Bonferroni).
     """
     if target_id not in matrix_df.columns:
         raise ValueError(f"Protein '{target_id}' nebyl nalezen v matici! Dostupné cíle: {list(matrix_df.columns[:5])}...")
@@ -199,7 +246,7 @@ def calculate_target_selectivity(
     if not other_targets:
         raise ValueError(f"Nelze provést analýzu selektivity: v matici není žádný jiný cíl kromě '{target_id}'!")
 
-    results = []
+    raw_results = []
 
     for compound_id, row in matrix_df.iterrows():
         target_score = row[target_id]
@@ -229,34 +276,57 @@ def calculate_target_selectivity(
             z_score = delta_score / 0.5
             p_val = 0.05 if abs(delta_score) >= delta_cutoff else 0.50
 
-        neg_log10_p = -np.log10(p_val)
-
-        # Klasifikace
-        if delta_score <= -delta_cutoff and p_val <= p_cutoff:
-            if target_score <= potent_cutoff:
-                category = "Vysoce selektivní silný hit"
-            else:
-                category = "Selektivní (mírná afinita)"
-        elif delta_score >= delta_cutoff and p_val <= p_cutoff:
-            category = "Preferuje ostatní proteiny"
-        else:
-            category = "Neselektivní / Nespecifický"
-
-        results.append({
+        raw_results.append({
             "compound_id": str(compound_id),
             "target_id": target_id,
             "target_score": round(target_score, 2),
             "median_others": round(median_others, 2),
             "delta_score": round(delta_score, 2),
             "z_score": round(z_score, 2),
-            "p_value": p_val,
-            "neg_log10_p": round(neg_log10_p, 2),
-            "category": category,
+            "raw_p_value": p_val,
         })
 
-    df_res = pd.DataFrame(results)
-    if not df_res.empty:
-        df_res = df_res.sort_values(by=["delta_score", "neg_log10_p"], ascending=[True, False])
+    if not raw_results:
+        return pd.DataFrame()
+
+    df_res = pd.DataFrame(raw_results)
+
+    # VÝPOČET KOREKCÍ VÍCENÁSOBNÉHO TESTOVÁNÍ PŘES TESTOVANÉ SLOUČENINY
+    p_vals = df_res["raw_p_value"].values
+    df_res["p_adj_fdr"] = np.round(multipletests_adjust(p_vals, method="fdr"), 6)
+    df_res["p_adj_bonferroni"] = np.round(multipletests_adjust(p_vals, method="bonferroni"), 6)
+    df_res["p_value"] = np.round(df_res["raw_p_value"], 6)
+
+    if p_adjust == "fdr":
+        active_p = df_res["p_adj_fdr"].values
+    elif p_adjust == "bonferroni":
+        active_p = df_res["p_adj_bonferroni"].values
+    else:
+        active_p = df_res["p_value"].values
+
+    active_p_safe = np.clip(active_p, 1e-15, 1.0)
+    df_res["neg_log10_p"] = np.round(-np.log10(active_p_safe), 2)
+
+    # Klasifikace
+    categories = []
+    for d_score, t_score, p_act in zip(df_res["delta_score"], df_res["target_score"], active_p):
+        if d_score <= -delta_cutoff and p_act <= p_cutoff:
+            if t_score <= potent_cutoff:
+                categories.append("Vysoce selektivní silný hit")
+            else:
+                categories.append("Selektivní (mírná afinita)")
+        elif d_score >= delta_cutoff and p_act <= p_cutoff:
+            categories.append("Preferuje ostatní proteiny")
+        else:
+            categories.append("Neselektivní / Nespecifický")
+
+    df_res["category"] = categories
+
+    cols_order = [
+        "compound_id", "target_id", "target_score", "median_others",
+        "delta_score", "z_score", "p_value", "p_adj_fdr", "p_adj_bonferroni", "neg_log10_p", "category"
+    ]
+    df_res = df_res[cols_order].sort_values(by=["delta_score", "neg_log10_p"], ascending=[True, False])
 
     return df_res
 
@@ -267,6 +337,7 @@ def plot_single_volcano(
     target_display: str,
     out_png: Path,
     out_pdf: Path,
+    p_adjust: str = "fdr",
     p_cutoff: float = 0.05,
     delta_cutoff: float = 1.0,
     max_labels: int = 10,
@@ -315,7 +386,13 @@ def plot_single_volcano(
     ax.axvline(-delta_cutoff, color="crimson", linestyle=":", linewidth=1.0, alpha=0.8, zorder=1)
     ax.axvline(delta_cutoff, color="steelblue", linestyle=":", linewidth=1.0, alpha=0.8, zorder=1)
 
-    # Označení top hitů textovými popisky (sanitizovaný název, aby nebyl gigantický SMILES)
+    # Textové označení prahu
+    thresh_lbl = "FDR" if p_adjust == "fdr" else ("p-adj" if p_adjust == "bonferroni" else "p")
+    x_min, x_max = ax.get_xlim()
+    ax.text(x_max - 0.2, log10_p_thresh + 0.1, f"{thresh_lbl} = {p_cutoff} (-log10 = {log10_p_thresh:.1f})",
+            fontsize=8, color="black", ha="right", va="bottom", fontstyle="italic")
+
+    # Označení top hitů textovými popisky (sanitizovaný název)
     top_hits = df_volcano[
         (df_volcano["delta_score"] <= -delta_cutoff) &
         (df_volcano["neg_log10_p"] >= log10_p_thresh)
@@ -351,8 +428,16 @@ def plot_single_volcano(
 
     # Osy a titulky
     ax.set_xlabel("Rozdíl afinity: ΔScore = Score(cíl) - Medián(ostatní) [kcal/mol]", fontsize=11, fontweight="bold", labelpad=8)
-    ax.set_ylabel("Statistická významnost: -log10(p-hodnota)", fontsize=11, fontweight="bold", labelpad=8)
-    ax.set_title(f"Target Selectivity Volcano Plot: {target_display}\n(Srovnání vůči panelu ostatních proteinů)",
+    
+    if p_adjust == "fdr":
+        y_label = "Statistická významnost: -log10(FDR / q-hodnota)\n(Benjamini-Hochberg korekce přes knihovnu ligandů)"
+    elif p_adjust == "bonferroni":
+        y_label = "Statistická významnost: -log10(p-adj)\n(Bonferroniho korekce přes knihovnu ligandů)"
+    else:
+        y_label = "Statistická významnost: -log10(p-hodnota)"
+
+    ax.set_ylabel(y_label, fontsize=11, fontweight="bold", labelpad=8)
+    ax.set_title(f"Target Selectivity Volcano Plot: {target_display}\n(Srovnání vůči panelu ostatních proteinů, korekce: {p_adjust.upper()})",
                  fontsize=13, fontweight="bold", pad=14)
 
     ax.legend(frameon=True, facecolor="white", edgecolor="lightgray", fontsize=8.5, loc="upper right")
@@ -372,6 +457,7 @@ def plot_multi_volcano_grid(
     annotations: dict[str, str],
     out_png: Path,
     out_pdf: Path,
+    p_adjust: str = "fdr",
     p_cutoff: float = 0.05,
     delta_cutoff: float = 1.0,
     dpi: int = 300,
@@ -395,7 +481,9 @@ def plot_multi_volcano_grid(
         ax = axes[row_idx][col_idx]
 
         try:
-            df_v = calculate_target_selectivity(matrix_df, target_id, p_cutoff=p_cutoff, delta_cutoff=delta_cutoff)
+            df_v = calculate_target_selectivity(
+                matrix_df, target_id, p_adjust=p_adjust, p_cutoff=p_cutoff, delta_cutoff=delta_cutoff
+            )
         except Exception as e:
             ax.set_title(f"{target_id} (Chyba: {e})", fontsize=10)
             continue
@@ -421,7 +509,7 @@ def plot_multi_volcano_grid(
         target_display = annotations.get(target_id, target_id)
         ax.set_title(f"{target_display} (Hity: {len(sel)})", fontsize=10.5, fontweight="bold")
         ax.set_xlabel("ΔScore [kcal/mol]", fontsize=8.5)
-        ax.set_ylabel("-log10(p-val)", fontsize=8.5)
+        ax.set_ylabel(f"-log10({p_adjust.upper()})", fontsize=8.5)
         ax.tick_params(labelsize=8)
 
     # Skrytí nepoužitých sub-plotů
@@ -430,7 +518,7 @@ def plot_multi_volcano_grid(
         c = idx % n_cols
         axes[r][c].set_visible(False)
 
-    fig.suptitle("Souhrnný přehled selektivity ligandů napříč vybranými methyltransferázami", fontsize=13.5, fontweight="bold", y=0.995)
+    fig.suptitle(f"Souhrnný přehled selektivity ligandů napříč vybranými methyltransferázami (Korekce: {p_adjust.upper()})", fontsize=13.5, fontweight="bold", y=0.995)
     plt.tight_layout()
 
     out_png.parent.mkdir(parents=True, exist_ok=True)
@@ -448,7 +536,7 @@ def main():
         epilog="""
 Příklady použití:
   python plot_docking_volcano.py -i reports_docking -t A2DJA1
-  python plot_docking_volcano.py -i reports_docking --top 5
+  python plot_docking_volcano.py -i reports_docking --p-adjust fdr --top 5
   python plot_docking_volcano.py -i reports_docking --top 6 --grid
   python plot_docking_volcano.py -i reports_docking --all
         """
@@ -464,6 +552,12 @@ Příklady použití:
         type=Path,
         default=None,
         help="Cílová složka pro grafy a tabulky (výchozí: <input_dir>/volcano_plots)."
+    )
+    parser.add_argument(
+        "--score-type",
+        choices=["adjusted", "raw", "residual"],
+        default="adjusted",
+        help="Typ dokovacího skóre: 'adjusted' (výchozí: MW-očištěné na škále kcal/mol), 'raw' (surová skóre), nebo 'residual' (kolem 0)."
     )
     parser.add_argument(
         "-t", "--target",
@@ -488,10 +582,16 @@ Příklady použití:
         help="Kromě samostatných grafů vygeneruje také sdružený multi-panel přehled (grid)."
     )
     parser.add_argument(
+        "--p-adjust",
+        choices=["fdr", "bonferroni", "none"],
+        default="fdr",
+        help="Korekce p-hodnot na vícenásobné testování: 'fdr' (Benjamini-Hochberg, výchozí), 'bonferroni' nebo 'none'."
+    )
+    parser.add_argument(
         "--p-cutoff",
         type=float,
         default=0.05,
-        help="Prahová hodnota p-value pro statistickou významnost (výchozí: 0.05)."
+        help="Prahová hodnota pro statistickou významnost (výchozí: 0.05 pro FDR/p-value)."
     )
     parser.add_argument(
         "--delta-cutoff",
@@ -520,7 +620,9 @@ Příklady použití:
 
     # Načtení dat
     try:
-        matrix_df, ranking_df, base_out_dir = load_data(args.input, known_targets=known_targets)
+        matrix_df, ranking_df, base_out_dir, used_score_type = load_data(
+            args.input, score_type=args.score_type, known_targets=known_targets
+        )
     except Exception as e:
         print(f"[!] Chyba při načítání dat: {e}", file=sys.stderr)
         sys.exit(1)
@@ -530,6 +632,11 @@ Příklady použití:
 
     all_targets = list(matrix_df.columns)
     selected_targets = []
+
+    print("=" * 70)
+    print(f"Generování Target Selectivity Volcano Plotů pro {len(all_targets)} cílů:")
+    print(f"  Použitá matice skóre:          {used_score_type}")
+    print(f"  Korekce vícenásobného testu:   {args.p_adjust.upper()}")
 
     if args.target:
         for t in args.target.split(","):
@@ -558,10 +665,11 @@ Příklady použití:
 
     print("=" * 70)
     print(f"Generování Target Selectivity Volcano Plotů pro {len(selected_targets)} vybraných cílů:")
-    print(f"  Celkem proteinů v panelu:  {len(all_targets)}")
-    print(f"  Celkem testovaných sloučenin: {len(matrix_df.index)}")
-    print(f"  Vybrané cíle:              {', '.join(selected_targets[:5])}{'...' if len(selected_targets)>5 else ''}")
-    print(f"  Výstupní složka:           {out_dir}")
+    print(f"  Celkem proteinů v panelu:      {len(all_targets)}")
+    print(f"  Celkem testovaných sloučenin:  {len(matrix_df.index)}")
+    print(f"  Korekce vícenásobného testu:   {args.p_adjust.upper()}")
+    print(f"  Vybrané cíle:                  {', '.join(selected_targets[:5])}{'...' if len(selected_targets)>5 else ''}")
+    print(f"  Výstupní složka:               {out_dir}")
     print("=" * 70)
 
     # Samostatné grafy
@@ -569,6 +677,7 @@ Příklady použití:
         df_volcano = calculate_target_selectivity(
             matrix_df=matrix_df,
             target_id=target_id,
+            p_adjust=args.p_adjust,
             potent_cutoff=args.potent_cutoff,
             p_cutoff=args.p_cutoff,
             delta_cutoff=args.delta_cutoff,
@@ -587,6 +696,7 @@ Příklady použití:
             target_display=target_display,
             out_png=png_path,
             out_pdf=pdf_path,
+            p_adjust=args.p_adjust,
             p_cutoff=args.p_cutoff,
             delta_cutoff=args.delta_cutoff,
             dpi=args.dpi,
@@ -602,6 +712,7 @@ Příklady použití:
             annotations=annotations,
             out_png=grid_png,
             out_pdf=grid_pdf,
+            p_adjust=args.p_adjust,
             p_cutoff=args.p_cutoff,
             delta_cutoff=args.delta_cutoff,
             dpi=args.dpi,
