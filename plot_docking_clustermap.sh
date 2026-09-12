@@ -10,11 +10,10 @@ export PYTHONNOUSERSITE=1
 # Detekce a aktivace conda prostředí
 if command -v conda &> /dev/null; then
     eval "$(conda shell.bash hook 2>/dev/null || true)"
-    if conda env list | grep -q "TV_easydock"; then
-        conda activate TV_easydock
-    elif conda env list | grep -q "cadd2026"; then
-        conda activate cadd2026
-    fi
+    conda activate TV_easydock 2>/dev/null || \
+    conda activate /storage/brno2/home/urbany/.conda/envs/TV_easydock 2>/dev/null || \
+    source activate /storage/brno2/home/urbany/.conda/envs/TV_easydock 2>/dev/null || \
+    conda activate cadd2026 2>/dev/null || true
 fi
 
 INPUT_DIR="${1:-reports_docking}"

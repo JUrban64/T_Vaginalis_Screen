@@ -22,6 +22,7 @@
 # ==============================================================================
 
 import argparse
+import re
 import sys
 from pathlib import Path
 import numpy as np
@@ -47,9 +48,102 @@ except ImportError:
     ADJUST_TEXT_AVAILABLE = False
 
 
-def load_data(input_path: Path) -> tuple[pd.DataFrame, pd.DataFrame | None, Path]:
+def load_protein_annotations(search_dir: Path | None = None) -> dict[str, str]:
+    """Načte anotace cílů pro výpis v titulku grafu (např. 'A2FE15 (ICMT)')."""
+    candidates = [
+        Path("reports/deduplicated_proteins.tsv"),
+        Path("reports_deduplicated/download_summary.csv"),
+        Path("targets.txt"),
+    ]
+    if search_dir:
+        candidates.insert(0, search_dir / "reports/deduplicated_proteins.tsv")
+        candidates.insert(1, search_dir.parent / "reports/deduplicated_proteins.tsv")
+
+    annots = {}
+    for c in candidates:
+        if c.exists():
+            try:
+                df = pd.read_csv(c, sep="\t" if c.suffix == ".tsv" else ",")
+                id_col = "Entry" if "Entry" in df.columns else df.columns[0]
+                gene_col = "Gene Names" if "Gene Names" in df.columns else None
+                entry_col = "Entry Name" if "Entry Name" in df.columns else None
+
+                for _, row in df.iterrows():
+                    tid = str(row[id_col]).strip()
+                    label = ""
+                    if gene_col and pd.notna(row[gene_col]):
+                        label = str(row[gene_col]).strip().split()[0]
+                    elif entry_col and pd.notna(row[entry_col]):
+                        ename = str(row[entry_col]).strip().split("_")[0]
+                        if ename != tid:
+                            label = ename
+                    annots[tid] = f"{tid} ({label})" if label else tid
+                if annots:
+                    break
+            except Exception:
+                pass
+    return annots
+
+
+def is_likely_target_id(val: str, known_targets: set[str] | None = None) -> bool:
+    """Ověří, zda je daný řetězec skutečně protein (UniProt ID)."""
+    if not isinstance(val, str):
+        return False
+    val_clean = val.strip()
+    if known_targets and val_clean in known_targets:
+        return True
+    if any(c in val_clean for c in "=#()[]@/\\+"):
+        return False
+    if len(val_clean) > 20 or len(val_clean) < 4:
+        return False
+    return bool(re.match(r"^[A-Z0-9]{6,10}$", val_clean, re.IGNORECASE))
+
+
+def detect_matrix_axes(df: pd.DataFrame, known_targets: set[str] | None = None) -> tuple[str, str]:
+    """Deterministicky určí osu proteinů a osu sloučenin."""
+    idx_name = str(df.index.name or "").lower()
+    col_name = str(df.columns.name or "").lower()
+
+    if "target" in idx_name or "protein" in idx_name:
+        return "targets_in_rows", "compounds_in_cols"
+    if "target" in col_name or "protein" in col_name:
+        return "targets_in_cols", "compounds_in_rows"
+    if "compound" in idx_name or "ligand" in idx_name or "smi" in idx_name:
+        return "targets_in_cols", "compounds_in_rows"
+    if "compound" in col_name or "ligand" in col_name or "smi" in col_name:
+        return "targets_in_rows", "compounds_in_cols"
+
+    idx_targets = sum(1 for x in df.index if is_likely_target_id(str(x), known_targets))
+    col_targets = sum(1 for x in df.columns if is_likely_target_id(str(x), known_targets))
+
+    if col_targets > idx_targets:
+        return "targets_in_cols", "compounds_in_rows"
+    elif idx_targets > col_targets:
+        return "targets_in_rows", "compounds_in_cols"
+
+    idx_has_smiles = any(any(c in str(x) for c in "=#()[]@") for x in df.index)
+    col_has_smiles = any(any(c in str(x) for c in "=#()[]@") for x in df.columns)
+    if idx_has_smiles and not col_has_smiles:
+        return "targets_in_cols", "compounds_in_rows"
+    if col_has_smiles and not idx_has_smiles:
+        return "targets_in_rows", "compounds_in_cols"
+
+    if abs(len(df.columns) - 49) < abs(len(df.index) - 49):
+        return "targets_in_cols", "compounds_in_rows"
+    return "targets_in_rows", "compounds_in_cols"
+
+
+def sanitize_compound_label(label: str, max_len: int = 16) -> str:
+    """Zkrátí příliš dlouhé popisky sloučenin (např. SMILES řetězce)."""
+    s = str(label).strip()
+    if len(s) > max_len:
+        return s[:max_len - 3] + "..."
+    return s
+
+
+def load_data(input_path: Path, known_targets: set[str] | None = None) -> tuple[pd.DataFrame, pd.DataFrame | None, Path]:
     """
-    Načte matici skóre a případný souhrnný ranking proteinů.
+    Načte matici skóre a zajistí, že SLOUPCE jsou PROTEINY a ŘÁDKY jsou SLOUČENINY.
     """
     if input_path.is_dir():
         score_file = input_path / "docking_scores_matrix.csv"
@@ -71,15 +165,19 @@ def load_data(input_path: Path) -> tuple[pd.DataFrame, pd.DataFrame | None, Path
         ranking_df = pd.read_csv(ranking_file) if ranking_file.exists() else None
         output_dir = input_path.parent
 
-    # Převedeme na float
     matrix_df = matrix_df.apply(pd.to_numeric, errors="coerce")
 
-    # Zkontrolujeme orientaci: chceme sloupce = proteiny, řádky = sloučeniny
-    n_rows, n_cols = matrix_df.shape
-    if n_cols > n_rows:
-        # Původně: řádky = proteiny, sloupce = ligandy -> transponujeme
+    # DETERMINISTICKÁ KONTROLA ORIENTACE
+    targets_axis, _ = detect_matrix_axes(matrix_df, known_targets)
+    if targets_axis == "targets_in_rows":
         matrix_df = matrix_df.T
 
+    # Odfiltrování neproteinových sloupců
+    valid_cols = [c for c in matrix_df.columns if is_likely_target_id(str(c), known_targets)]
+    if len(valid_cols) >= 3:
+        matrix_df = matrix_df[valid_cols]
+
+    matrix_df.columns.name = "target_id"
     matrix_df.index.name = "compound_id"
     return matrix_df, ranking_df, output_dir
 
@@ -109,37 +207,36 @@ def calculate_target_selectivity(
             continue
 
         other_scores = row[other_targets].dropna().values
-        if len(other_scores) < 3:
+        if len(other_scores) < 1:
             continue
 
         median_others = float(np.median(other_scores))
         mean_others = float(np.mean(other_scores))
-        std_others = float(np.std(other_scores, ddof=1))
 
-        # Robustní směrodatná odchylka pomocí MAD (Median Absolute Deviation)
+        # Robustní rozptyl (MAD)
         mad = float(np.median(np.abs(other_scores - median_others)))
-        robust_scale = max(1.4826 * mad, 0.08)  # Ochrana před nulovým rozptylem
+        robust_scale = max(1.4826 * mad, 0.12)
 
         # Efekt: delta skóre (záporná hodnota = silnější na cíli)
         delta_score = target_score - median_others
 
-        # Z-skóre a p-hodnota z robustního Studentova t-testu
-        df_deg = len(other_scores) - 1
-        z_score = (target_score - median_others) / robust_scale
-        # Oboustranný p-value
-        p_val = 2.0 * stats.t.sf(abs(z_score), df=df_deg)
-        p_val = max(min(p_val, 1.0), 1e-15)  # Ochrana před 0.0 pro log10
+        if len(other_scores) >= 3:
+            df_deg = len(other_scores) - 1
+            z_score = (target_score - median_others) / robust_scale
+            p_val = 2.0 * stats.t.sf(abs(z_score), df=df_deg)
+            p_val = max(min(p_val, 1.0), 1e-15)
+        else:
+            z_score = delta_score / 0.5
+            p_val = 0.05 if abs(delta_score) >= delta_cutoff else 0.50
 
         neg_log10_p = -np.log10(p_val)
 
         # Klasifikace
-        # 1. Selektivní hit: silnější na cíli (delta <= -delta_cutoff) a statisticky signifikantní
         if delta_score <= -delta_cutoff and p_val <= p_cutoff:
             if target_score <= potent_cutoff:
                 category = "Vysoce selektivní silný hit"
             else:
                 category = "Selektivní (mírná afinita)"
-        # 2. Preferuje jiné cíle: slabší na cíli než na zbytku
         elif delta_score >= delta_cutoff and p_val <= p_cutoff:
             category = "Preferuje ostatní proteiny"
         else:
@@ -159,7 +256,6 @@ def calculate_target_selectivity(
 
     df_res = pd.DataFrame(results)
     if not df_res.empty:
-        # Seřazení: nejvíce selektivní s nejvyšší statistickou významností nahoře
         df_res = df_res.sort_values(by=["delta_score", "neg_log10_p"], ascending=[True, False])
 
     return df_res
@@ -168,6 +264,7 @@ def calculate_target_selectivity(
 def plot_single_volcano(
     df_volcano: pd.DataFrame,
     target_id: str,
+    target_display: str,
     out_png: Path,
     out_pdf: Path,
     p_cutoff: float = 0.05,
@@ -181,11 +278,10 @@ def plot_single_volcano(
     sns.set_theme(style="whitegrid", font="sans-serif")
     plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Arial", "Helvetica"]
 
-    fig, ax = plt.subplots(figsize=(9.0, 7.5), dpi=dpi)
+    fig, ax = plt.subplots(figsize=(9.5, 7.5), dpi=dpi)
 
     log10_p_thresh = -np.log10(p_cutoff)
 
-    # Barevná mapa pro kategorie
     palette = {
         "Vysoce selektivní silný hit": "#b2182b",   # Sytá červená
         "Selektivní (mírná afinita)": "#ef8a62",    # Světle oranžová
@@ -193,7 +289,7 @@ def plot_single_volcano(
         "Neselektivní / Nespecifický": "#999999",   # Neutrální šedá
     }
 
-    # Vykreslení bodů podle kategorií (nejdříve šedé pozadí, pak významné body navrchu)
+    # Vykreslení bodů
     for cat in ["Neselektivní / Nespecifický", "Preferuje ostatní proteiny", "Selektivní (mírná afinita)", "Vysoce selektivní silný hit"]:
         sub = df_volcano[df_volcano["category"] == cat]
         if sub.empty:
@@ -219,12 +315,7 @@ def plot_single_volcano(
     ax.axvline(-delta_cutoff, color="crimson", linestyle=":", linewidth=1.0, alpha=0.8, zorder=1)
     ax.axvline(delta_cutoff, color="steelblue", linestyle=":", linewidth=1.0, alpha=0.8, zorder=1)
 
-    # Textové anotace prahů
-    x_min, x_max = ax.get_xlim()
-    ax.text(x_max - 0.2, log10_p_thresh + 0.1, f"p = {p_cutoff} (-log10 = {log10_p_thresh:.1f})",
-            fontsize=8, color="black", ha="right", va="bottom", fontstyle="italic")
-
-    # Označení top hitů textovými popisky
+    # Označení top hitů textovými popisky (sanitizovaný název, aby nebyl gigantický SMILES)
     top_hits = df_volcano[
         (df_volcano["delta_score"] <= -delta_cutoff) &
         (df_volcano["neg_log10_p"] >= log10_p_thresh)
@@ -232,10 +323,11 @@ def plot_single_volcano(
 
     texts = []
     for _, r in top_hits.iterrows():
+        short_cid = sanitize_compound_label(r["compound_id"], max_len=14)
         t = ax.text(
             r["delta_score"],
             r["neg_log10_p"],
-            f"{r['compound_id']} ({r['target_score']:.1f})",
+            f"{short_cid} ({r['target_score']:.1f})",
             fontsize=8,
             fontweight="bold",
             color="#67001f",
@@ -246,12 +338,11 @@ def plot_single_volcano(
         if ADJUST_TEXT_AVAILABLE:
             adjust_text(texts, ax=ax, arrowprops=dict(arrowstyle="->", color="#67001f", lw=0.6))
         else:
-            # Jednoduchý posun, pokud není adjustText
             for t in texts:
                 t.set_position((t.get_position()[0], t.get_position()[1] + 0.15))
 
-    # Šipky a popisky směrů selektivity v záhlaví
-    ax.annotate("← Vyšší afinita k tomuto cíli (Selektivní)",
+    # Šipky a popisky
+    ax.annotate("← Vyšší afinita k tomuto cíli (Selektivní hity)",
                 xy=(0.03, 0.96), xycoords="axes fraction",
                 fontsize=9.5, fontweight="bold", color="#b2182b")
     ax.annotate("Preferuje jiné methyltransferázy →",
@@ -261,7 +352,7 @@ def plot_single_volcano(
     # Osy a titulky
     ax.set_xlabel("Rozdíl afinity: ΔScore = Score(cíl) - Medián(ostatní) [kcal/mol]", fontsize=11, fontweight="bold", labelpad=8)
     ax.set_ylabel("Statistická významnost: -log10(p-hodnota)", fontsize=11, fontweight="bold", labelpad=8)
-    ax.set_title(f"Target Selectivity Volcano Plot: {target_id}\n(Srovnání vůči panelu ostatních proteinů)",
+    ax.set_title(f"Target Selectivity Volcano Plot: {target_display}\n(Srovnání vůči panelu ostatních proteinů)",
                  fontsize=13, fontweight="bold", pad=14)
 
     ax.legend(frameon=True, facecolor="white", edgecolor="lightgray", fontsize=8.5, loc="upper right")
@@ -278,6 +369,7 @@ def plot_single_volcano(
 def plot_multi_volcano_grid(
     matrix_df: pd.DataFrame,
     targets: list[str],
+    annotations: dict[str, str],
     out_png: Path,
     out_pdf: Path,
     p_cutoff: float = 0.05,
@@ -285,7 +377,7 @@ def plot_multi_volcano_grid(
     dpi: int = 300,
 ):
     """
-    Vykreslí přehledový multi-panel grid (např. 2x3 nebo 3x2) pro skupinu proteinů.
+    Vykreslí přehledový multi-panel grid pro skupinu proteinů.
     """
     n_targets = len(targets)
     if n_targets == 0:
@@ -294,7 +386,7 @@ def plot_multi_volcano_grid(
     n_cols = 3 if n_targets >= 3 else n_targets
     n_rows = int(np.ceil(n_targets / n_cols))
 
-    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5.0 * n_cols, 4.2 * n_rows), dpi=dpi, squeeze=False)
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(5.2 * n_cols, 4.4 * n_rows), dpi=dpi, squeeze=False)
     log10_p_thresh = -np.log10(p_cutoff)
 
     for idx, target_id in enumerate(targets):
@@ -308,7 +400,6 @@ def plot_multi_volcano_grid(
             ax.set_title(f"{target_id} (Chyba: {e})", fontsize=10)
             continue
 
-        # Body
         non_sel = df_v[df_v["category"].str.startswith("Neselektivní")]
         sel = df_v[df_v["category"].str.contains("selektivní", case=False)]
         counter = df_v[df_v["category"].str.contains("Preferuje", case=False)]
@@ -317,19 +408,20 @@ def plot_multi_volcano_grid(
         ax.scatter(counter["delta_score"], counter["neg_log10_p"], c="#2166ac", alpha=0.8, s=35, label="Ostatní")
         ax.scatter(sel["delta_score"], sel["neg_log10_p"], c="#b2182b", alpha=0.9, s=45, edgecolors="black", linewidths=0.5, label="Selektivní hity")
 
-        # Prahové linky
         ax.axhline(log10_p_thresh, color="black", linestyle="--", linewidth=0.8, alpha=0.6)
         ax.axvline(-delta_cutoff, color="crimson", linestyle=":", linewidth=0.8, alpha=0.7)
         ax.axvline(delta_cutoff, color="steelblue", linestyle=":", linewidth=0.8, alpha=0.7)
 
-        # Anotace top 3 hitů
+        # Anotace top 3 hitů (zkrácené)
         top3 = sel.head(3)
         for _, r in top3.iterrows():
-            ax.text(r["delta_score"], r["neg_log10_p"] + 0.1, r["compound_id"], fontsize=7, fontweight="bold", color="#67001f")
+            short_id = sanitize_compound_label(r["compound_id"], max_len=10)
+            ax.text(r["delta_score"], r["neg_log10_p"] + 0.1, short_id, fontsize=7, fontweight="bold", color="#67001f")
 
-        ax.set_title(f"Cíl: {target_id} (Hity: {len(sel)})", fontsize=11, fontweight="bold")
-        ax.set_xlabel("ΔScore [kcal/mol]", fontsize=9)
-        ax.set_ylabel("-log10(p-val)", fontsize=9)
+        target_display = annotations.get(target_id, target_id)
+        ax.set_title(f"{target_display} (Hity: {len(sel)})", fontsize=10.5, fontweight="bold")
+        ax.set_xlabel("ΔScore [kcal/mol]", fontsize=8.5)
+        ax.set_ylabel("-log10(p-val)", fontsize=8.5)
         ax.tick_params(labelsize=8)
 
     # Skrytí nepoužitých sub-plotů
@@ -338,7 +430,7 @@ def plot_multi_volcano_grid(
         c = idx % n_cols
         axes[r][c].set_visible(False)
 
-    fig.suptitle("Souhrnný přehled selektivity ligandů napříč vybranými methyltransferázami", fontsize=14, fontweight="bold", y=0.995)
+    fig.suptitle("Souhrnný přehled selektivity ligandů napříč vybranými methyltransferázami", fontsize=13.5, fontweight="bold", y=0.995)
     plt.tight_layout()
 
     out_png.parent.mkdir(parents=True, exist_ok=True)
@@ -355,16 +447,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Příklady použití:
-  # 1. Volcano plot pro konkrétní cíl (např. A2DJA1):
   python plot_docking_volcano.py -i reports_docking -t A2DJA1
-
-  # 2. Volcano ploty pro TOP 5 nejlepších proteinů ze souhrnného rankingu:
   python plot_docking_volcano.py -i reports_docking --top 5
-
-  # 3. Vytvoření multi-panel gridu pro TOP 6 cílů v jednom obrázku:
   python plot_docking_volcano.py -i reports_docking --top 6 --grid
-
-  # 4. Pro všechny proteiny:
   python plot_docking_volcano.py -i reports_docking --all
         """
     )
@@ -429,9 +514,13 @@ Příklady použití:
 
     args = parser.parse_args()
 
-    # 1. Načtení dat
+    # Načtení anotací
+    annotations = load_protein_annotations()
+    known_targets = set(annotations.keys())
+
+    # Načtení dat
     try:
-        matrix_df, ranking_df, base_out_dir = load_data(args.input)
+        matrix_df, ranking_df, base_out_dir = load_data(args.input, known_targets=known_targets)
     except Exception as e:
         print(f"[!] Chyba při načítání dat: {e}", file=sys.stderr)
         sys.exit(1)
@@ -439,52 +528,43 @@ Příklady použití:
     out_dir = args.output_dir if args.output_dir else (base_out_dir / "volcano_plots")
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. Určení seznamu cílů k analýze
     all_targets = list(matrix_df.columns)
     selected_targets = []
 
     if args.target:
-        # Zadaný konkrétní cíl nebo seznam cílů
         for t in args.target.split(","):
             t_clean = t.strip()
             if t_clean in all_targets:
                 selected_targets.append(t_clean)
             else:
-                print(f"[!] Varování: Cíl '{t_clean}' nebyl nalezen v matici skóre!", file=sys.stderr)
-    elif args.all:
-        selected_targets = all_targets
+                print(f"[!] Varování: Cíl '{t_clean}' nebyl nalezen v matici!", file=sys.stderr)
     elif args.top:
         if ranking_df is not None and "target_id" in ranking_df.columns:
-            ranked_list = [t for t in ranking_df["target_id"].tolist() if t in all_targets]
-            selected_targets = ranked_list[:args.top]
+            top_ranked = ranking_df["target_id"].head(args.top).tolist()
+            selected_targets = [t for t in top_ranked if t in all_targets]
         else:
-            # Pokud nemáme ranking, vybereme prvních N
             selected_targets = all_targets[:args.top]
+    elif args.all:
+        selected_targets = all_targets
     else:
-        # Výchozí chování: pokud máme ranking, vezmeme TOP 5 cílů, jinak první 3
         if ranking_df is not None and "target_id" in ranking_df.columns:
-            selected_targets = [t for t in ranking_df["target_id"].tolist() if t in all_targets][:5]
-            print(f"[*] Nebyl zadán parametr -t ani --top. Automaticky vybírám TOP 5 cílů z rankingu: {', '.join(selected_targets)}")
+            selected_targets = ranking_df["target_id"].head(3).tolist()
         else:
             selected_targets = all_targets[:3]
-            print(f"[*] Nebyl zadán parametr -t ani --top. Vybírám první 3 cíle: {', '.join(selected_targets)}")
 
     if not selected_targets:
-        print("[!] Nebyly vybrány žádné platné cíle k analýze!", file=sys.stderr)
+        print("[!] Nebyly vybrány žádné platné proteiny pro analýzu!", file=sys.stderr)
         sys.exit(1)
 
     print("=" * 70)
-    print("Generování Target Selectivity Volcano Plotů (Varianta A):")
-    print(f"  Analyzované cíle ({len(selected_targets)}): {', '.join(selected_targets)}")
-    print(f"  Prahová p-hodnota:     {args.p_cutoff} (-log10 = {-np.log10(args.p_cutoff):.2f})")
-    print(f"  Prahová selektivita:   |ΔScore| >= {args.delta_cutoff} kcal/mol")
-    print(f"  Prahová afinita hitu:  Score <= {args.potent_cutoff} kcal/mol")
-    print(f"  Výstupní složka:       {out_dir}")
+    print(f"Generování Target Selectivity Volcano Plotů pro {len(selected_targets)} vybraných cílů:")
+    print(f"  Celkem proteinů v panelu:  {len(all_targets)}")
+    print(f"  Celkem testovaných sloučenin: {len(matrix_df.index)}")
+    print(f"  Vybrané cíle:              {', '.join(selected_targets[:5])}{'...' if len(selected_targets)>5 else ''}")
+    print(f"  Výstupní složka:           {out_dir}")
     print("=" * 70)
 
-    # 3. Zpracování jednotlivých cílů
-    summary_selective_rows = []
-
+    # Samostatné grafy
     for target_id in selected_targets:
         df_volcano = calculate_target_selectivity(
             matrix_df=matrix_df,
@@ -494,20 +574,17 @@ Příklady použití:
             delta_cutoff=args.delta_cutoff,
         )
 
-        if df_volcano.empty:
-            print(f"[!] Pro cíl '{target_id}' se nepodařilo spočítat žádné hodnoty.")
-            continue
-
-        # Uložení tabulky výsledků pro daný cíl
-        csv_path = out_dir / f"selectivity_table_{target_id}.csv"
+        csv_path = out_dir / f"volcano_selectivity_{target_id}.csv"
         df_volcano.to_csv(csv_path, index=False)
 
-        # Uložení Volcano plotu
-        png_path = out_dir / f"volcano_{target_id}.png"
-        pdf_path = out_dir / f"volcano_{target_id}.pdf"
+        png_path = out_dir / f"volcano_selectivity_{target_id}.png"
+        pdf_path = out_dir / f"volcano_selectivity_{target_id}.pdf"
+
+        target_display = annotations.get(target_id, target_id)
         plot_single_volcano(
             df_volcano=df_volcano,
             target_id=target_id,
+            target_display=target_display,
             out_png=png_path,
             out_pdf=pdf_path,
             p_cutoff=args.p_cutoff,
@@ -515,18 +592,14 @@ Příklady použití:
             dpi=args.dpi,
         )
 
-        # Agregace top selektivních hitů
-        top_sel = df_volcano[df_volcano["category"].str.contains("selektivní", case=False)]
-        if not top_sel.empty:
-            summary_selective_rows.append(top_sel)
-
-    # 4. Multi-panel přehledový grid (pokud je požadován nebo analyzujeme >= 4 cíle)
-    if args.grid or len(selected_targets) in [4, 6, 8, 9, 12]:
-        grid_png = out_dir / "volcano_grid_overview.png"
-        grid_pdf = out_dir / "volcano_grid_overview.pdf"
+    # Multi-panel přehled
+    if args.grid and len(selected_targets) > 1:
+        grid_png = out_dir / "volcano_selectivity_grid.png"
+        grid_pdf = out_dir / "volcano_selectivity_grid.pdf"
         plot_multi_volcano_grid(
             matrix_df=matrix_df,
-            targets=selected_targets[:12],  # Maximálně 12 panelů pro přehlednost
+            targets=selected_targets,
+            annotations=annotations,
             out_png=grid_png,
             out_pdf=grid_pdf,
             p_cutoff=args.p_cutoff,
@@ -534,14 +607,7 @@ Příklady použití:
             dpi=args.dpi,
         )
 
-    # 5. Společná souhrnná tabulka všech selektivních hitů napříč analyzovanými proteiny
-    if summary_selective_rows:
-        master_selective_df = pd.concat(summary_selective_rows, ignore_index=True)
-        master_csv = out_dir / "all_selective_hits_summary.csv"
-        master_selective_df.to_csv(master_csv, index=False)
-        print(f"\n[+] Souhrnná tabulka všech selektivních hitů uložena: {master_csv}")
-
-    print("\n[✓] Hotovo! Všechny Volcano ploty a tabulky selektivity byly vygenerovány.")
+    print(f"\n[✓] Hotovo! Všechny Volcano ploty selektivity uloženy do: '{out_dir}/'")
 
 
 if __name__ == "__main__":
