@@ -66,14 +66,8 @@ def main():
     parser.add_argument(
         "-p", "--protonation",
         default="molgpka",
-        choices=["molgpka", "molgpka_fix", "none", "chemaxon"],
-        help="Metoda protonace (default: molgpka)"
-    )
-    parser.add_argument(
-        "--pH",
-        type=float,
-        default=7.4,
-        help="Cílové pH pro protonaci (default: 7.4)"
+        choices=["molgpka", "pkasolver", "chemaxon", "none"],
+        help="Metoda protonace (default: molgpka - fyziologické pH 7.4)"
     )
     parser.add_argument(
         "--ring-sample",
@@ -125,7 +119,6 @@ def main():
 
     if args.protonation != "none":
         cmd.extend(["--protonation", args.protonation])
-        cmd.extend(["--pH", str(args.pH)])
 
     if args.ring_sample:
         cmd.append("--ring_sample")
@@ -136,15 +129,19 @@ def main():
     print(f"  Výstupní DB:      {output_path}")
     print(f"  CPU vláken:       {args.ncpu}")
     print(f"  Stereoisomery:    až {args.stereoisomers}")
-    print(f"  Protonace:        {args.protonation} (pH {args.pH})")
+    print(f"  Protonace:        {args.protonation}")
     print(f"  Příkaz:           {' '.join(cmd)}")
     print("=" * 70)
 
     start_time = time.time()
 
+    # Zamezení načítání starých/nekompatibilních balíčků z ~/.local
+    env = os.environ.copy()
+    env["PYTHONNOUSERSITE"] = "1"
+
     try:
         # Spuštění jako podproces se streamováním výstupu v reálném čase
-        proc = subprocess.run(cmd, check=True)
+        proc = subprocess.run(cmd, check=True, env=env)
         elapsed = time.time() - start_time
         print("\n" + "=" * 70)
         print(f"[+] Hotovo za {elapsed:.1f} sekund ({elapsed / 60:.2f} minut)!")

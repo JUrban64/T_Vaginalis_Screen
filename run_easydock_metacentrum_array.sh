@@ -1,34 +1,7 @@
 #!/bin/bash
-# ==============================================================================
-# OpenPBS / PBS Pro Array Job skript pro EasyDock na MetaCentru (CESNET)
-#
-# Účel:
-#   Paralelní virtuální screening (docking) knihovny ligandů do všech proteinových
-#   cílů pomocí PBS job array (1 podúloha = 1 proteinový cíl).
-#
-# Spuštění úlohy:
-#   1. Připravte soubor se seznamem cílů (např. targets.txt, kde každý řádek je název cíle)
-#   2. Zjistěte počet řádků/cílů: N=$(wc -l < targets.txt)
-#   3. Odešlete úlohu: qsub -J 1-$N run_easydock_metacentrum_array.sh
-# ==============================================================================
-
-# ---------------------------- PBS Direktivity ---------------------------------
-#SBATCH/PBS název úlohy
-#PBS -N easydock_screen
-
-# Zdroje na jeden uzel/cíl:
-# - 16 CPU jader
-# - 32 GB RAM
-# - 30-50 GB rychlý lokální NVMe/SSD scratch (nutnost pro SQLite DB!)
-#PBS -l select=1:ncpus=16:mem=32gb:scratch_local=40gb
-
-# Maximální doba běhu (např. 24 hodin, upravte dle velikosti knihovny)
-#PBS -l walltime=24:00:00
-
-# Spojení STDOUT a STDERR do jednoho log souboru
-#PBS -j oe
-
-# Výchozí rozsah job array (lze přepsat při volání qsub -J 1-N ...)
+#PBS -N T.Vaginalis_test_2
+#PBS -l select=1:ncpus=16:mem=32gb:scratch_ssd=40gb
+#PBS -l walltime=01:00:00
 #PBS -J 1-49
 
 # ------------------------------------------------------------------------------
@@ -106,7 +79,7 @@ echo "[*] Aktivuji prostředí pro EasyDock..."
 # Zvolte podle vašeho nastavení na MetaCentru (Conda modul nebo vlastní miniconda):
 if command -v conda &> /dev/null; then
     eval "$(conda shell.bash hook)"
-    conda activate easydock || {
+    source activate  /storage/brno2/home/urbany/.conda/envs/TV_easydock || {
         echo "[!] Nepodařilo se aktivovat conda env 'easydock', zkouším výchozí python"
     }
 elif [ -f /etc/profile.d/modules.sh ]; then
@@ -147,7 +120,7 @@ cp "$GRID_TXT" "${SCRATCHDIR}/grid.txt"
 cat << EOF > "${SCRATCHDIR}/config.yml"
 protein: ${SCRATCHDIR}/protein.pdbqt
 protein_setup: ${SCRATCHDIR}/grid.txt
-exhaustiveness: 8
+exhaustiveness: 16
 seed: 42
 n_poses: 5
 ncpu: ${NCPU_PER_MOL}
@@ -181,22 +154,6 @@ easydock ${RUN_ARGS}
 
 echo "[+] Docking pro '${TARGET_ID}' úspěšně dokončen!"
 
-# ----------------- 7. Volitelná kontrola kvality a interakcí ------------------
-# A) PoseBusters validace (pokud máme protein.pdb s vodíky)
-if [ -f "${SCRATCHDIR}/protein.pdb" ] && command -v easydock_bust >/dev/null 2>&1; then
-    echo "[*] Spouštím PoseBusters kontrolu kvality (easydock_bust)..."
-    easydock_bust -i "${SCRATCHDIR}/${DB_NAME}" -p "${SCRATCHDIR}/protein.pdb" -c ${PARALLEL_MOLS} || {
-        echo "[!] Varování: PoseBusters kontrola selhala nebo skončila s chybou."
-    }
-fi
-
-# B) PLIF interakční fingerprinty (pokud máme protein.pdb s vodíky)
-if [ -f "${SCRATCHDIR}/protein.pdb" ] && command -v easydock_plif >/dev/null 2>&1; then
-    echo "[*] Počítám protein-ligand interakční fingerprinty (easydock_plif)..."
-    easydock_plif -i "${SCRATCHDIR}/${DB_NAME}" -p "${SCRATCHDIR}/protein.pdb" -c ${PARALLEL_MOLS} || {
-        echo "[!] Varování: PLIF výpočet selhal nebo skončil s chybou."
-    }
-fi
 
 # ----------------- 8. Zkopírování výsledků zpět do úložiště --------------------
 echo "[*] Kopíruji výsledky zpět do ${RESULTS_DIR}..."
